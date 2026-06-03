@@ -12,8 +12,8 @@ DS5_DIR = next(DATA_DIR.glob("Dataset 5*"))
 DS6_DIR = next(DATA_DIR.glob("Dataset 6*"))
 
 ZONAL_LOAD_FILE = DS6_DIR / "eindhoven_zonal_load.csv"
-TENNET_CONGESTION_FILE = DS5_DIR / "tennetcongestion.csv"
-CONGESTION_PC6_FILE = DS5_DIR / "congestion_pc6.csv"
+TENNET_CONGESTION_FILE = DS5_DIR / "tennetcongestie.csv"
+CONGESTION_PC6_FILE = DS5_DIR / "congestie_pc6.csv"
 
 FOCUS_ZONE = "Z2"
 EINDHOVEN_PC_PREFIXES = ("561", "562", "563", "564")
@@ -51,12 +51,11 @@ def load_eindhoven_congestion_levels() -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     tennet_df = pd.read_csv(TENNET_CONGESTION_FILE, sep=";", encoding="utf-8")
     tennet_df.columns = [col.strip().strip(",") for col in tennet_df.columns]
-    tennet_df = tennet_df.rename(columns={"tennet_id": "station_id"})
-    tennet_df["consumption"] = parse_eu_decimal(tennet_df["consumption"])
-    tennet_df["generation"] = parse_eu_decimal(tennet_df["generation"])
+    tennet_df["afname"] = parse_eu_decimal(tennet_df["afname"])
+    tennet_df["opwek"] = parse_eu_decimal(tennet_df["opwek"])
 
     eindhoven_stations = tennet_df.loc[
-        tennet_df["station_id"].astype(str).str.contains("Eindhoven", case=False, na=False)
+        tennet_df["tennet_id"].astype(str).str.contains("Eindhoven", case=False, na=False)
     ].copy()
 
     pc6_chunks = []
@@ -64,11 +63,11 @@ def load_eindhoven_congestion_levels() -> tuple[pd.DataFrame, pd.DataFrame]:
         CONGESTION_PC6_FILE, sep=";", encoding="utf-8", chunksize=200_000
     ):
         chunk.columns = [col.strip().strip(",") for col in chunk.columns]
-        mask = chunk["postal_code"].astype(str).str.startswith(EINDHOVEN_PC_PREFIXES)
+        mask = chunk["postcode"].astype(str).str.startswith(EINDHOVEN_PC_PREFIXES)
         if mask.any():
             filtered = chunk.loc[mask].copy()
-            filtered["consumption"] = parse_eu_decimal(filtered["consumption"])
-            filtered["generation"] = parse_eu_decimal(filtered["generation"])
+            filtered["afname"] = parse_eu_decimal(filtered["afname"])
+            filtered["opwek"] = parse_eu_decimal(filtered["opwek"])
             pc6_chunks.append(filtered)
 
     eindhoven_pc6 = (
@@ -96,11 +95,11 @@ def main() -> None:
     eindhoven_stations, eindhoven_pc6 = load_eindhoven_congestion_levels()
     sim_space = build_simulation_space(hourly_demand)
 
-    station_consumption = float(eindhoven_stations["consumption"].mean())
-    station_generation = float(eindhoven_stations["generation"].mean())
+    station_consumption = float(eindhoven_stations["afname"].mean())
+    station_generation = float(eindhoven_stations["opwek"].mean())
     if not eindhoven_pc6.empty:
-        pc6_consumption = float(eindhoven_pc6["consumption"].mean())
-        pc6_generation = float(eindhoven_pc6["generation"].mean())
+        pc6_consumption = float(eindhoven_pc6["afname"].mean())
+        pc6_generation = float(eindhoven_pc6["opwek"].mean())
     else:
         pc6_consumption = pc6_generation = float("nan")
 
@@ -119,11 +118,11 @@ def main() -> None:
     print(f"Mean demand: {sim_space['Baseline_Grid_Load_MW'].mean():.2f} MW")
     print()
     print("=== Dataset 5 congestion ratings (0=none, 3=blocked) ===")
-    print(f"Eindhoven stations – avg consumption: {station_consumption:.2f}")
-    print(f"Eindhoven stations – avg generation: {station_generation:.2f}")
+    print(f"Eindhoven stations – avg afname (consumption): {station_consumption:.2f}")
+    print(f"Eindhoven stations – avg opwek (generation): {station_generation:.2f}")
     if pd.notna(pc6_consumption):
-        print(f"Eindhoven PC6 – avg consumption: {pc6_consumption:.2f}")
-        print(f"Eindhoven PC6 – avg generation: {pc6_generation:.2f}")
+        print(f"Eindhoven PC6 – avg afname (consumption): {pc6_consumption:.2f}")
+        print(f"Eindhoven PC6 – avg opwek (generation): {pc6_generation:.2f}")
 
     plt.figure(figsize=(12, 6))
     plt.plot(
@@ -148,7 +147,7 @@ def main() -> None:
     plt.legend(loc="upper left")
     subtitle = (
         f"Dataset 5 – Eindhoven station congestion (avg): "
-        f"consumption {station_consumption:.1f}, generation {station_generation:.1f} | "
+        f"afname {station_consumption:.1f}, opwek {station_generation:.1f} | "
         f"PC6 codes: {len(eindhoven_pc6)}"
     )
     plt.gcf().text(0.5, 0.01, subtitle, ha="center", fontsize=9, color="#374151")

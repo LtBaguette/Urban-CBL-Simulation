@@ -46,6 +46,7 @@ Tune `residuals:` in [`config/default.yaml`](config/default.yaml). Do not compar
 - **DSO vs customer savings** in `app_scenarios_kpi.csv` (`annual_dso_savings_eur`, `dso_savings_warning`)
 - Rate assumptions: [`config/dso_assumptions.md`](config/dso_assumptions.md) and `dso_value` in YAML (±20% sensitivity)
 - **Charts:** all PNGs under [`Graphs/`](Graphs/) (stakeholder pack + profiles; CSVs stay in `sim_outputs/`)
+- **Monthly customer savings:** `sim/customer_savings.py` → `sim_outputs/app_scenarios/customer_monthly_savings.csv` and `Graphs/graph_customer_monthly_savings.png`
 - Reference gap diagnosis printed by `scripts/run_zone2.py` (`summarize_reference_gap`)
 
 ## Tests

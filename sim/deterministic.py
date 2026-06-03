@@ -30,6 +30,7 @@ from sim.metrics import (
     grid_stress_minutes,
 )
 from sim.paths import DISTRICTS_FILE
+from sim.customer_savings import save_monthly_customer_savings
 from sim.validate import summarize_reference_gap, validate_reference_savings
 
 
@@ -280,6 +281,8 @@ def run_app_scenarios(cfg: SimConfig | None = None) -> pd.DataFrame:
 
     kpi_df = pd.DataFrame(kpi_rows)
     kpi_df.to_csv(out_dir / "app_scenarios_kpi.csv", index=False)
+    monthly_path = save_monthly_customer_savings(cfg)
+    print(f"Monthly customer savings: {monthly_path}")
 
     graphs_dir = cfg.ensure_graphs_dir()
     _plot_charging_profiles(frames, graphs_dir / "app_charging_profiles.png", cfg)

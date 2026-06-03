@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 
 from sim.config import SimConfig, load_config
+from sim.customer_savings import SMART_SCENARIOS, load_monthly_customer_savings
+from sim.metrics import days_per_month
 
 ORDER_STORY = [
     "immediate_plug_in",
@@ -437,6 +439,58 @@ def plot_all_savings(kpi_df: pd.DataFrame, out_path: Path, cfg: SimConfig) -> No
     plt.close(fig)
 
 
+def plot_customer_monthly_savings(
+    monthly_df: pd.DataFrame, out_path: Path, cfg: SimConfig
+) -> None:
+    """Per-EV monthly bill savings for smart app scenarios vs immediate plug-in."""
+    smart = monthly_df[monthly_df["scenario"].isin(SMART_SCENARIOS)].copy()
+    if smart.empty:
+        smart = monthly_df[monthly_df["monthly_savings_per_ev_eur"] > 0].copy()
+    x = np.arange(len(smart))
+    x_labels = [LABELS[s] for s in smart["scenario"]]
+    per_ev = smart["monthly_savings_per_ev_eur"]
+
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    bars = ax.bar(x, per_ev, width=0.55, color="#22c55e", edgecolor="white")
+    ax.set_ylabel("Average savings per EV (EUR / month)")
+    ax.set_xlabel("Smart charging app")
+    ax.set_title(
+        "What drivers save each month with the smart charging app\n"
+        f"(vs charging at full power when plugged in, {cfg.fleet.n_evs:,} EV fleet)",
+        fontweight="bold",
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(x_labels, fontsize=9)
+    ax.grid(axis="y", linestyle="--", alpha=0.45)
+    ax.set_ylim(0, max(per_ev.max() * 1.18, 5))
+
+    for bar, eur in zip(bars, per_ev):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.8,
+            f"EUR {eur:.0f}/mo",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
+
+    ax.text(
+        0.5,
+        -0.11,
+        f"Based on simulated day-ahead prices × {cfg.fleet.kwh_per_day:.0f} kWh/day per vehicle "
+        f"({days_per_month(cfg):.1f} days/month)",
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=9,
+        style="italic",
+    )
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.12)
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def generate_stakeholder_pack(cfg: SimConfig | None = None) -> list[Path]:
     cfg = cfg or load_config()
     out = _graphs(cfg)
@@ -444,18 +498,21 @@ def generate_stakeholder_pack(cfg: SimConfig | None = None) -> list[Path]:
     ref_ts = load_timeseries("immediate_plug_in", cfg)
     smart_ts = load_timeseries("smart_price_aware", cfg)
 
+    monthly_df = load_monthly_customer_savings(cfg)
     paths = [
         out / "graph_customer_savings.png",
+        out / "graph_customer_monthly_savings.png",
         out / "graph_all_savings.png",
         out / "graph_ev_shift.png",
         out / "graph_daily_comparison.png",
         out / "graph_grid_peak_compare.png",
     ]
     plot_customer_savings(kpi_df, paths[0], cfg)
-    plot_all_savings(kpi_df, paths[1], cfg)
-    plot_ev_shift(ref_ts, smart_ts, paths[2], cfg)
-    plot_daily_comparison(ref_ts, smart_ts, paths[3], cfg)
-    plot_peak_compare_subset(kpi_df, paths[4], cfg)
+    plot_customer_monthly_savings(monthly_df, paths[1], cfg)
+    plot_all_savings(kpi_df, paths[2], cfg)
+    plot_ev_shift(ref_ts, smart_ts, paths[3], cfg)
+    plot_daily_comparison(ref_ts, smart_ts, paths[4], cfg)
+    plot_peak_compare_subset(kpi_df, paths[5], cfg)
     return paths
 
 

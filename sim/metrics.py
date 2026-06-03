@@ -29,8 +29,17 @@ def enrich_simulation_frame(
     )
 
 
+def daily_ev_energy_cost(ev_load: pd.Series, price: pd.Series, cfg: SimConfig) -> float:
+    """Fleet EV charging cost for one representative day (EUR)."""
+    return float((ev_load * cfg.dt_hours * price).sum())
+
+
 def annual_ev_energy_cost(ev_load: pd.Series, price: pd.Series, cfg: SimConfig) -> float:
-    return float((ev_load * cfg.dt_hours * price).sum() * 365)
+    return daily_ev_energy_cost(ev_load, price, cfg) * 365
+
+
+def days_per_month(cfg: SimConfig) -> float:
+    return 365.0 / 12.0
 
 
 def grid_stress_minutes(frame: pd.DataFrame, cfg: SimConfig) -> tuple[int, int]:
