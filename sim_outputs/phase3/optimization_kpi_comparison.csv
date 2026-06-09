@@ -1,0 +1,4 @@
+kpi_id,kpi_name,baseline_scenario,optimized_scenario,baseline_value,optimized_value,improvement,unit,source,notes
+2,annual_customer_savings_eur,immediate_plug_in,smart_grid_aware,0.0,1700738.8681426314,1700738.8681426314,EUR/year,sim_outputs/app_scenarios/app_scenarios_kpi.csv,
+3,congestion_stress_integral_saved,immediate_plug_in,smart_grid_aware,0.0,0.218220011789209,0.218220011789209,stress_integral,sim_outputs/app_scenarios/app_scenarios_kpi.csv,
+4,peak_reduction_mw,unmanaged (residuals hourly),"managed (residuals water-filling, 60% app)",0.0,4.822390730760435,4.822390730760435,MW,sim_outputs/residuals/residuals_kpi.csv,Mean over 5 stochastic runs; std=0.09 MW

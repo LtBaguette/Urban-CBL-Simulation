@@ -8,6 +8,8 @@ python scripts/run_zone2.py
 python scripts/run_app_scenarios.py
 python scripts/generate_graphs.py
 python scripts/run_residuals.py   # optional: hourly AR(1) + partial app adoption
+python scripts/run_simulation_v5.py
+python scripts/run_method_comparison.py
 python -m pytest tests/ -q
 ```
 
@@ -28,6 +30,29 @@ Configuration: [`config/default.yaml`](config/default.yaml)
 | `sim/residuals.py` | Hourly AR(1) demand + charger mix + partial smart charging |
 
 Legacy entry points `zone2_simulation.py` and `zone2_app_charging_sim.py` call the same runners.
+
+## All-method comparison (unified KPIs)
+
+Six methods on **identical fields**, reference = `immediate_plug_in`:
+
+| Method key | Label |
+|------------|-------|
+| `immediate_plug_in` | Immediate plug-in (reference) |
+| `unmanaged_evening` | Baseline (evening peak) |
+| `smart_flat_spread` | Smart (flat spread) |
+| `smart_price_aware` | Smart (price-aware) |
+| `smart_grid_aware` | Smart (grid + price) |
+| `simulation_v5` | Simulation V5 (managed, ~60% app) |
+
+Outputs: `sim_outputs/method_comparison.csv`, `Graphs/graph_method_comparison.png`. Ranked by `annual_total_savings_eur` (customer + DSO). All methods use **`residuals.app_adoption_rate`** (default 60%): blended EV load = 40% immediate plug-in + 60% method schedule; V5 already models partial adoption internally.
+
+## Simulation V5
+
+| Output | Path |
+|--------|------|
+| V5 per-run CSV | `sim_outputs/simulation_v5/run_NNN_15min.csv` |
+| V5 KPI (incl. € savings) | `sim_outputs/simulation_v5/simulation_v5_kpi.csv` |
+| Chart | `Graphs/simulation_v5_15min.png` |
 
 ## Residuals prototype (hourly, stochastic)
 

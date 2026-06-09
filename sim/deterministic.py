@@ -34,65 +34,6 @@ from sim.customer_savings import save_monthly_customer_savings
 from sim.validate import summarize_reference_gap, validate_reference_savings
 
 
-def _plot_baseline_vs_intervention(
-    baseline: pd.DataFrame,
-    interventions: dict[int, pd.DataFrame],
-    out_path: Path,
-    cfg: SimConfig,
-) -> None:
-    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-    axes[0].plot(
-        baseline.index,
-        baseline["Total_Load_MW"],
-        label="Baseline total load",
-        color="#dc2626",
-        linewidth=2,
-    )
-    for pct, frame in interventions.items():
-        axes[0].plot(
-            frame.index,
-            frame["Total_Load_MW"],
-            label=f"Intervention {pct}%",
-            linewidth=1.5,
-            alpha=0.85,
-        )
-    axes[0].axhline(
-        baseline["Zone_Capacity_MW"].iloc[0],
-        color="#6b7280",
-        linestyle="--",
-        label="Zone capacity",
-    )
-    axes[0].set_ylabel("Load (MW)")
-    axes[0].set_title(f"Zone {cfg.focus_zone}: Baseline vs Smart Charging Interventions")
-    axes[0].legend(loc="upper left")
-    axes[0].grid(True, linestyle="--", alpha=0.5)
-
-    axes[1].plot(
-        baseline.index,
-        baseline["Stress_Ratio"],
-        label="Baseline stress",
-        color="#dc2626",
-        linewidth=2,
-    )
-    for pct, frame in interventions.items():
-        axes[1].plot(
-            frame.index,
-            frame["Stress_Ratio"],
-            label=f"Intervention {pct}%",
-            linewidth=1.5,
-            alpha=0.85,
-        )
-    axes[1].axhline(1.0, color="#6b7280", linestyle="--", label="Stress = 1.0")
-    axes[1].set_ylabel("Stress ratio")
-    axes[1].set_xlabel("Time of day")
-    axes[1].legend(loc="upper left")
-    axes[1].grid(True, linestyle="--", alpha=0.5)
-    fig.autofmt_xdate()
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-
-
 def _plot_charging_profiles(
     frames: dict[str, pd.DataFrame], out_path: Path, cfg: SimConfig
 ) -> None:
@@ -193,14 +134,6 @@ def run_zone2_interventions(cfg: SimConfig | None = None) -> pd.DataFrame:
     )
     kpi_df = pd.DataFrame(kpi_rows)
     kpi_df.to_csv(out_dir / "zone2_kpi_comparison.csv", index=False)
-
-    graphs_dir = cfg.ensure_graphs_dir()
-    _plot_baseline_vs_intervention(
-        baseline_frame,
-        intervention_frames,
-        graphs_dir / "zone2_baseline_vs_intervention.png",
-        cfg,
-    )
 
     print("=== Zone Z2 smart charging simulation ===")
     print(f"Districts metadata rows: {len(districts)}")

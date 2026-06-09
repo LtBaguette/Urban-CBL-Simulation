@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from sim.config import SimConfig
@@ -32,6 +33,16 @@ def enrich_simulation_frame(
 def daily_ev_energy_cost(ev_load: pd.Series, price: pd.Series, cfg: SimConfig) -> float:
     """Fleet EV charging cost for one representative day (EUR)."""
     return float((ev_load * cfg.dt_hours * price).sum())
+
+
+def daily_ev_energy_cost_slots(
+    ev_load: pd.Series | np.ndarray,
+    price: pd.Series | np.ndarray,
+    slots_per_hour: int = 4,
+) -> float:
+    """Fleet EV charging cost from aligned 15-min slot arrays (EUR)."""
+    dt_hours = 1.0 / slots_per_hour
+    return float((np.asarray(ev_load) * np.asarray(price) * dt_hours).sum())
 
 
 def annual_ev_energy_cost(ev_load: pd.Series, price: pd.Series, cfg: SimConfig) -> float:
