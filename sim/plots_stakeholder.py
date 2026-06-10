@@ -56,63 +56,6 @@ def load_timeseries(scenario: str, cfg: SimConfig | None = None) -> pd.DataFrame
     return pd.read_csv(path, parse_dates=["timestamp"]).set_index("timestamp")
 
 
-def plot_customer_savings(kpi_df: pd.DataFrame, out_path: Path, cfg: SimConfig) -> None:
-    x = np.arange(len(kpi_df))
-    x_labels = [LABELS[s] for s in kpi_df["scenario"]]
-    savings_k = kpi_df["annual_customer_savings_eur"] / 1000.0
-    colors = ["#9ca3af" if s == "immediate_plug_in" else "#22c55e" for s in kpi_df["scenario"]]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    bars = ax.bar(x, savings_k, color=colors, width=0.65, edgecolor="white")
-    ax.set_ylabel("Annual savings (thousand EUR)")
-    ax.set_xlabel("Charging behaviour")
-    ax.set_title(
-        "Annual EV charging cost savings (Zone Z2, 5,000 EVs)",
-        fontweight="bold",
-    )
-    ax.set_xticks(x)
-    ax.set_xticklabels(x_labels, fontsize=9)
-    ax.grid(axis="y", linestyle="--", alpha=0.45)
-    ax.set_ylim(0, max(savings_k.max() * 1.15, 50))
-
-    for bar, eur in zip(bars, kpi_df["annual_customer_savings_eur"]):
-        label = "Reference" if eur <= 0 else f"EUR {eur / 1000:.0f}k\nper year"
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 15,
-            label,
-            ha="center",
-            va="bottom",
-            fontsize=9,
-            fontweight="bold" if eur > 0 else "normal",
-        )
-
-    ax.text(
-        0.5,
-        -0.14,
-        "Compared to charging at full power when plugged in",
-        transform=ax.transAxes,
-        ha="center",
-        fontsize=10,
-        style="italic",
-    )
-    ax.text(
-        0.98,
-        0.97,
-        f"Fleet: {cfg.fleet.n_evs:,} EVs | {cfg.fleet.kwh_per_day:.0f} kWh/day per vehicle\n"
-        f"Daily fleet energy: {cfg.fleet.daily_mwh:.0f} MWh",
-        transform=ax.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9,
-        bbox=dict(boxstyle="round", facecolor="#ecfdf5", edgecolor="#a7f3d0"),
-    )
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=0.14)
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-
-
 COLOR_CUSTOMER = "#22c55e"
 COLOR_DSO_GAIN = "#6366f1"
 COLOR_DSO_COST = "#f87171"
@@ -337,13 +280,11 @@ def generate_stakeholder_pack(cfg: SimConfig | None = None) -> list[Path]:
 
     monthly_df = load_monthly_customer_savings(cfg)
     paths = [
-        out / "graph_customer_savings.png",
         out / "graph_customer_monthly_savings.png",
         out / "graph_all_savings.png",
     ]
-    plot_customer_savings(kpi_df, paths[0], cfg)
-    plot_customer_monthly_savings(monthly_df, paths[1], cfg)
-    plot_all_savings(kpi_df, paths[2], cfg)
+    plot_customer_monthly_savings(monthly_df, paths[0], cfg)
+    plot_all_savings(kpi_df, paths[1], cfg)
     return paths
 
 
@@ -370,10 +311,14 @@ def generate_all_graphs(cfg: SimConfig | None = None) -> list[Path]:
     paths.append(app_profiles)
 
     try:
-        from sim.method_comparison import generate_method_comparison
+        from sim.method_comparison import (
+            generate_all_methods_profiles,
+            generate_method_comparison,
+        )
 
         _, method_chart = generate_method_comparison(cfg)
         paths.append(method_chart)
+        paths.append(generate_all_methods_profiles(cfg))
     except FileNotFoundError:
         pass
 

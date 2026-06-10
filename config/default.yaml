@@ -82,3 +82,14 @@ residuals:
     Home: 0.75
     Fast: 0.20
     Super: 0.05
+  # el diablo scheduler objective: price_weight × €/MWh + grid_weight × penalty × MW
+  v5_objective:
+    price_weight: 1.0
+    grid_weight: 1.0
+    grid_load_penalty_eur_per_mw: 0.08   # tuned vs price-oriented baseline (deterministic APP keeps 0.75)
+  # scripts/run_simulation_v5_price_spike.py — one 15-min slot with extreme wholesale price
+  price_spike_test:
+    start_hour: 3
+    start_minute: 0
+    duration_minutes: 15
+    price_eur_mwh: 500.0

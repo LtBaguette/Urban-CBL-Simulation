@@ -9,6 +9,7 @@ python scripts/run_app_scenarios.py
 python scripts/generate_graphs.py
 python scripts/run_residuals.py   # optional: hourly AR(1) + partial app adoption
 python scripts/run_simulation_v5.py
+python scripts/run_simulation_v5_price_spike.py   # optional: high-price window test
 python scripts/run_method_comparison.py
 python -m pytest tests/ -q
 ```
@@ -28,12 +29,11 @@ Configuration: [`config/default.yaml`](config/default.yaml)
 | `sim/validate.py` | Reference savings check |
 | `sim/deterministic.py` | Main simulation runners |
 | `sim/residuals.py` | Hourly AR(1) demand + charger mix + partial smart charging |
-
-Legacy entry points `zone2_simulation.py` and `zone2_app_charging_sim.py` call the same runners.
+| `sim/simulation_v5.py` | el diablo — 15-min AR(1) stochastic optimizer |
 
 ## All-method comparison (unified KPIs)
 
-Six methods on **identical fields**, reference = `immediate_plug_in`:
+Eight methods on **identical fields**, reference = `immediate_plug_in`:
 
 | Method key | Label |
 |------------|-------|
@@ -42,17 +42,23 @@ Six methods on **identical fields**, reference = `immediate_plug_in`:
 | `smart_flat_spread` | Smart (flat spread) |
 | `smart_price_aware` | Smart (price-aware) |
 | `smart_grid_aware` | Smart (grid + price) |
-| `simulation_v5` | Simulation V5 (managed, ~60% app) |
+| `simulation_v5` | el diablo (~60% app) |
+| `price_oriented_baseline` | Price-only block scheduler (`sim/price_oriented_optimizer.py`) |
+| `grid_oriented_baseline` | Grid-only block scheduler (`sim/grid_oriented_optimizer.py`, V5 without price term) |
 
-Outputs: `sim_outputs/method_comparison.csv`, `Graphs/graph_method_comparison.png`. Ranked by `annual_total_savings_eur` (customer + DSO). All methods use **`residuals.app_adoption_rate`** (default 60%): blended EV load = 40% immediate plug-in + 60% method schedule; V5 already models partial adoption internally.
+Outputs: `sim_outputs/method_comparison.csv`, `Graphs/graph_method_comparison.png`, `Graphs/all_methods_profiles.png` (EV / total load / stress for all 8 methods). Ranked by `annual_total_savings_eur` (customer + DSO). All methods use **`residuals.app_adoption_rate`** (default 60%): blended EV load = 40% immediate plug-in + 60% method schedule; stochastic methods model partial adoption on the same V5 grid days.
 
-## Simulation V5
+el diablo scheduler objective (`residuals.v5_objective` in YAML): `price_weight × €/MWh + grid_weight × grid_load_penalty × MW`. Tuned separately from deterministic `grid_aware.load_penalty_eur_per_mw` (0.75).
+
+## el diablo (simulation_v5)
 
 | Output | Path |
 |--------|------|
-| V5 per-run CSV | `sim_outputs/simulation_v5/run_NNN_15min.csv` |
-| V5 KPI (incl. € savings) | `sim_outputs/simulation_v5/simulation_v5_kpi.csv` |
+| Per-run CSV | `sim_outputs/simulation_v5/run_NNN_15min.csv` |
+| KPI (incl. € savings) | `sim_outputs/simulation_v5/simulation_v5_kpi.csv` |
 | Chart | `Graphs/simulation_v5_15min.png` |
+
+**Price-spike test** (`residuals.price_spike_test` in YAML): sets one 15-min slot (default 03:00–03:15) to EUR 500/MWh and checks whether the block optimizer shifts managed charging away. Outputs: `sim_outputs/simulation_v5_price_spike/`, `Graphs/simulation_v5_15min_price_spike.png` (adds a price panel and shades the spike window).
 
 ## Residuals prototype (hourly, stochastic)
 
@@ -80,9 +86,3 @@ Tune `residuals:` in [`config/default.yaml`](config/default.yaml). Do not compar
 - `tests/test_kpi_regression.py` — KPI snapshot tolerances
 - `tests/test_capacity.py` — capacity metadata sanity
 - `tests/test_dso_value.py` — DSO warnings and rate bounds
-
-## Other legacy scripts
-
-`Baseline_Simulation_Dynamic*.py` — exploratory hourly t-distribution plots only.
-
-`Baseline_Simulation_ResidualsV4.5*.py` — thin wrapper; same as `scripts/run_residuals.py`.

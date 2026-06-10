@@ -23,7 +23,7 @@ def cfg():
 
 def test_all_methods_present(cfg):
     if not APP_KPI.exists() or not V5_KPI.exists():
-        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py first")
+        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py (el diablo) first")
     df = build_method_comparison(cfg)
     assert len(df) == len(METHOD_ORDER)
     assert list(df["method_key"]) == [k for k, _ in METHOD_ORDER]
@@ -33,14 +33,14 @@ def test_all_methods_present(cfg):
 
 def test_unified_columns(cfg):
     if not APP_KPI.exists() or not V5_KPI.exists():
-        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py first")
+        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py (el diablo) first")
     df = build_method_comparison(cfg)
     assert list(df.columns) == UNIFIED_COLUMNS
 
 
 def test_reference_zeros(cfg):
     if not APP_KPI.exists() or not V5_KPI.exists():
-        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py first")
+        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py (el diablo) first")
     df = build_method_comparison(cfg).set_index("method_key")
     ref = df.loc[REFERENCE_METHOD]
     assert ref["annual_customer_savings_eur"] == pytest.approx(0.0, abs=1.0)
@@ -51,7 +51,7 @@ def test_reference_zeros(cfg):
 
 def test_smart_price_beats_baseline(cfg):
     if not APP_KPI.exists() or not V5_KPI.exists():
-        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py first")
+        pytest.skip("Run run_app_scenarios.py and run_simulation_v5.py (el diablo) first")
     df = build_method_comparison(cfg).set_index("method_key")
     assert (
         df.loc["smart_price_aware", "annual_total_savings_eur"]

@@ -39,6 +39,9 @@ class ResidualsConfig:
     charger_kw: dict[str, float]
     morning_charger_mix: dict[str, float]
     evening_charger_mix: dict[str, float]
+    v5_price_weight: float
+    v5_grid_weight: float
+    v5_grid_load_penalty_eur_per_mw: float
 
 
 def load_residuals_config(
@@ -57,6 +60,10 @@ def load_residuals_config(
         return {k: float(m[k]) for k in CHARGER_KEYS}
 
     evening_h = int(res.get("evening_deadline_h", timing.get("ready_by_hour", 7)))
+    v5_obj = res.get("v5_objective", {})
+    default_v5_penalty = float(
+        v5_obj.get("grid_load_penalty_eur_per_mw", sim_cfg.grid_load_penalty_eur_per_mw)
+    )
 
     return sim_cfg, ResidualsConfig(
         app_adoption_rate=float(res.get("app_adoption_rate", 0.60)),
@@ -78,6 +85,9 @@ def load_residuals_config(
         evening_charger_mix=_mix("evening_charger_mix")
         if "evening_charger_mix" in res
         else {"Home": 0.75, "Fast": 0.20, "Super": 0.05},
+        v5_price_weight=float(v5_obj.get("price_weight", 1.0)),
+        v5_grid_weight=float(v5_obj.get("grid_weight", 1.0)),
+        v5_grid_load_penalty_eur_per_mw=default_v5_penalty,
     )
 
 

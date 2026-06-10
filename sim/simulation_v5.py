@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-import sys
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,21 +11,17 @@ import pandas as pd
 from scipy.interpolate import CubicSpline
 from scipy.stats import t
 
-ROOT = Path(__file__).resolve().parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from sim.capacity import resolve_zone_capacity_mw
-from sim.config import SimConfig, load_config
-from sim.data_loaders import load_mean_hourly_price_profile, load_zone2_15min_demand
-from sim.dso_value import annual_dso_savings_eur
-from sim.metrics import (
+from .capacity import resolve_zone_capacity_mw
+from .config import SimConfig, load_config
+from .data_loaders import load_mean_hourly_price_profile, load_zone2_15min_demand
+from .dso_value import annual_dso_savings_eur
+from .metrics import (
     congestion_stress_integral_saved,
     daily_ev_energy_cost_slots,
     grid_stress_minutes,
 )
-from sim.paths import ZONAL_LOAD_FILE
-from sim.residuals import ResidualsConfig, load_residuals_config
+from .paths import ZONAL_LOAD_FILE
+from .residuals import ResidualsConfig, load_residuals_config
 
 CONFIDENCE_INTERVAL = 0.95
 SIMULATION_REPEATS = 1
@@ -42,6 +38,9 @@ EVENING_DEADLINE_H = 7
 AR1_MAX_ITER = 200
 SAVE_OUTPUTS = True
 SHOW_PLOT = False
+V5_PRICE_WEIGHT = 1.0
+V5_GRID_WEIGHT = 1.0
+V5_GRID_LOAD_PENALTY = 0.75
 EV_DAILY_MWH = N_EVS * EV_KWH_PER_DAY / 1_000
 CHARGER_KW = {"Home": 11.0, "Fast": 50.0, "Super": 150.0}
 MORNING_CHARGER_MIX = {"Home": 0.40, "Fast": 0.50, "Super": 0.10}
@@ -62,6 +61,7 @@ def _apply_runtime_config(sim_cfg: SimConfig, res_cfg: ResidualsConfig) -> None:
     global APP_ADOPTION_RATE, MORNING_MAX_WINDOW_H, EVENING_DEADLINE_H
     global CHARGER_KW, MORNING_CHARGER_MIX, EVENING_CHARGER_MIX
     global SAVE_OUTPUTS, SHOW_PLOT
+    global V5_PRICE_WEIGHT, V5_GRID_WEIGHT, V5_GRID_LOAD_PENALTY
 
     CONFIDENCE_INTERVAL = res_cfg.confidence_interval
     SIMULATION_REPEATS = res_cfg.simulation_repeats
@@ -78,6 +78,9 @@ def _apply_runtime_config(sim_cfg: SimConfig, res_cfg: ResidualsConfig) -> None:
     EVENING_CHARGER_MIX = dict(res_cfg.evening_charger_mix)
     SAVE_OUTPUTS = res_cfg.save_outputs
     SHOW_PLOT = res_cfg.show_plot
+    V5_PRICE_WEIGHT = res_cfg.v5_price_weight
+    V5_GRID_WEIGHT = res_cfg.v5_grid_weight
+    V5_GRID_LOAD_PENALTY = res_cfg.v5_grid_load_penalty_eur_per_mw
     _validate_charger_config()
 
 
@@ -249,6 +252,44 @@ def load_slot_price_profile(sim_cfg: SimConfig) -> pd.Series:
     return pd.Series(hourly_price.values, index=range(N_SLOTS), name="price_eur_mwh")
 
 
+@dataclass(frozen=True)
+class PriceSpike:
+    """Temporary wholesale price spike on one or more 15-min slots."""
+
+    start_hour: int
+    start_minute: int
+    duration_minutes: int
+    price_eur_mwh: float
+
+    def slot_indices(self) -> list[int]:
+        start_slot = self.start_hour * SLOTS_PER_HOUR + self.start_minute // SLOT_MINUTES
+        n_slots = max(1, self.duration_minutes // SLOT_MINUTES)
+        return [(start_slot + i) % N_SLOTS for i in range(n_slots)]
+
+    def label(self) -> str:
+        end_total = self.start_hour * 60 + self.start_minute + self.duration_minutes
+        end_h, end_m = divmod(end_total, 60)
+        return (
+            f"{self.start_hour:02d}:{self.start_minute:02d}"
+            f"-{end_h % 24:02d}:{end_m:02d}"
+        )
+
+
+def apply_price_spike(slot_prices: pd.Series, spike: PriceSpike) -> pd.Series:
+    out = slot_prices.copy()
+    for slot in spike.slot_indices():
+        out[slot] = spike.price_eur_mwh
+    return out
+
+
+DEFAULT_PRICE_SPIKE = PriceSpike(
+    start_hour=3,
+    start_minute=0,
+    duration_minutes=15,
+    price_eur_mwh=500.0,
+)
+
+
 def _block_effective_cost(
     block: list[int],
     current_total: np.ndarray,
@@ -256,9 +297,14 @@ def _block_effective_cost(
     mw_fleet: float,
     grid_load_penalty: float,
     slot_duration_h: float,
+    price_weight: float = 1.0,
+    grid_weight: float = 1.0,
 ) -> float:
     return sum(
-        (slot_prices[s] + grid_load_penalty * (current_total[s] + mw_fleet))
+        (
+            price_weight * slot_prices[s]
+            + grid_weight * grid_load_penalty * (current_total[s] + mw_fleet)
+        )
         * mw_fleet
         * slot_duration_h
         for s in block
@@ -278,7 +324,12 @@ def optimize_ev_load_constrained(
     grid_load_penalty: float,
     arrival_weights: pd.Series,
     app_seed: int,
+    *,
+    price_weight: float | None = None,
+    grid_weight: float | None = None,
 ) -> tuple[pd.Series, pd.Series, float, float, float]:
+    price_weight = V5_PRICE_WEIGHT if price_weight is None else price_weight
+    grid_weight = V5_GRID_WEIGHT if grid_weight is None else grid_weight
     rng = np.random.default_rng(app_seed)
     non_app_load_mw = np.zeros(N_SLOTS)
     non_app_active = np.zeros(N_SLOTS, dtype=float)
@@ -334,6 +385,8 @@ def optimize_ev_load_constrained(
                 mw_fleet,
                 grid_load_penalty,
                 slot_duration_h,
+                price_weight,
+                grid_weight,
             )
             if score < best_score:
                 best_score = score
@@ -377,38 +430,63 @@ def optimize_ev_load_constrained(
     )
 
 
-def main() -> None:
+def run_simulation_v5(
+    price_spike: PriceSpike | None = None,
+    *,
+    output_subdir: str = "simulation_v5",
+    chart_filename: str = "simulation_v5_15min.png",
+) -> Path:
     sim_cfg, res_cfg = load_residuals_config()
     _apply_runtime_config(sim_cfg, res_cfg)
-    out_dir = sim_cfg.output_dir / "simulation_v5"
+    out_dir = sim_cfg.output_dir / output_subdir
     if SAVE_OUTPUTS:
         out_dir.mkdir(parents=True, exist_ok=True)
 
     grid_15 = load_zone2_15min_demand(sim_cfg)
     zone_capacity_mw, cap_meta = resolve_zone_capacity_mw(grid_15, sim_cfg)
-    slot_prices = load_slot_price_profile(sim_cfg)
+    baseline_slot_prices = load_slot_price_profile(sim_cfg)
+    slot_prices = (
+        apply_price_spike(baseline_slot_prices, price_spike)
+        if price_spike is not None
+        else baseline_slot_prices
+    )
+    spike_slots = price_spike.slot_indices() if price_spike else []
 
     arrival_weights = build_arrival_weights()
     slot_mean, slot_std, phi, dof = load_zone2_statistics()
     ev_load_profile, ev_active_profile = build_ev_load_profile(arrival_weights)
 
-    print(f"\n=== Zone {FOCUS_ZONE} simulation V5 (15-min AR1 + smart charging) ===")
+    experiment_label = (
+        f"price spike {price_spike.label()} @ EUR {price_spike.price_eur_mwh:.0f}/MWh"
+        if price_spike
+        else "15-min AR1 + smart charging"
+    )
+    print(f"\n=== Zone {FOCUS_ZONE} el diablo ({experiment_label}) ===")
     print(
         f"Fleet: {N_EVS:,} EVs x {EV_KWH_PER_DAY} kWh/day = {EV_DAILY_MWH:.1f} MWh/day"
     )
     print(f"Zone capacity: {zone_capacity_mw:.2f} MW ({cap_meta['capacity_source']})")
     print(
-        f"Price + grid penalty: EUR {slot_prices.min():.1f}-{slot_prices.max():.1f}/MWh, "
-        f"load_penalty={sim_cfg.grid_load_penalty_eur_per_mw:.2f} EUR/MW"
+        f"Price + grid objective: EUR {slot_prices.min():.1f}-{slot_prices.max():.1f}/MWh, "
+        f"weights price={res_cfg.v5_price_weight:.2f} grid={res_cfg.v5_grid_weight:.2f}, "
+        f"grid_penalty={res_cfg.v5_grid_load_penalty_eur_per_mw:.2f} EUR/MW"
     )
+    if price_spike:
+        for slot in spike_slots:
+            print(
+                f"  Spike slot {slot_label(slot)}: "
+                f"EUR {baseline_slot_prices[slot]:.1f} -> EUR {slot_prices[slot]:.1f}/MWh"
+            )
     print(f"App adoption target: {APP_ADOPTION_RATE * 100:.0f}% | Runs: {SIMULATION_REPEATS}")
 
     slots = range(N_SLOTS)
     xticks = range(0, N_SLOTS, SLOTS_PER_HOUR)
     xlabels = [f"{h:02d}:00" for h in range(24)]
-    fig, axes = plt.subplots(2, 1, figsize=(16, 9), sharex=True)
+    n_rows = 3 if price_spike else 2
+    fig, axes = plt.subplots(n_rows, 1, figsize=(16, 10 if price_spike else 9), sharex=True)
+    if n_rows == 2:
+        axes = list(axes)
     colours = ["#378ADD", "#1D9E75", "#D85A30", "#9B59B6", "#E67E22"]
-    historical_peak_mw = float(slot_mean.max() + 3 * slot_std.max())
     kpi_rows: list[dict[str, float]] = []
 
     for sim in range(1, SIMULATION_REPEATS + 1):
@@ -422,9 +500,11 @@ def main() -> None:
             optimize_ev_load_constrained(
                 base_load,
                 slot_prices,
-                sim_cfg.grid_load_penalty_eur_per_mw,
+                res_cfg.v5_grid_load_penalty_eur_per_mw,
                 arrival_weights,
                 app_seed,
+                price_weight=res_cfg.v5_price_weight,
+                grid_weight=res_cfg.v5_grid_weight,
             )
         )
         opt_total_demand = base_load + opt_ev_load
@@ -530,32 +610,103 @@ def main() -> None:
         axes[0].plot(slots, opt_total_demand, color=colour, lw=1.5, ls="--", label=f"Run {sim} managed ({actual_rate*100:.0f}% app)")
         axes[1].plot(slots, ev_active, color=colour, lw=1.5, ls="-")
         axes[1].plot(slots, opt_ev_active, color=colour, lw=1.5, ls="--")
-        print(
-            f"Run {sim}: adoption {actual_rate*100:.1f}% | peak {peak_unmanaged:.1f} -> {peak_managed:.1f} MW"
-        )
+        if price_spike and spike_slots:
+            spike_slot = spike_slots[0]
+            managed_at_spike = int(opt_ev_active[spike_slot])
+            unmanaged_at_spike = int(ev_active[spike_slot])
+            print(
+                f"Run {sim}: adoption {actual_rate*100:.1f}% | peak {peak_unmanaged:.1f} -> "
+                f"{peak_managed:.1f} MW | EVs at spike {slot_label(spike_slot)}: "
+                f"{unmanaged_at_spike} unmg / {managed_at_spike} mgd"
+            )
+        else:
+            print(
+                f"Run {sim}: adoption {actual_rate*100:.1f}% | peak {peak_unmanaged:.1f} -> "
+                f"{peak_managed:.1f} MW"
+            )
+
+    if price_spike and spike_slots:
+        for slot in spike_slots:
+            axes[0].axvspan(
+                slot - 0.5,
+                slot + 0.5,
+                color="#fecaca",
+                alpha=0.35,
+                zorder=0,
+            )
+            axes[1].axvspan(
+                slot - 0.5,
+                slot + 0.5,
+                color="#fecaca",
+                alpha=0.35,
+                zorder=0,
+            )
 
     axes[0].axhline(zone_capacity_mw, color="#dc2626", ls=":", lw=1.5, label=f"Zone capacity ({zone_capacity_mw:.0f} MW)")
     axes[0].plot(slots, slot_mean, color="black", lw=1.5, ls=":", label="Historical mean")
     axes[1].axhline(N_EVS, color="#6b7280", ls=":", lw=1.2, label="Fleet size")
     axes[0].set_ylabel("Demand (MW)")
-    axes[0].set_title(f"Zone {FOCUS_ZONE}: 15-min AR(1) unmanaged vs managed ({APP_ADOPTION_RATE*100:.0f}% app target)")
+    title = (
+        f"Zone {FOCUS_ZONE}: el diablo — 15-min AR(1) unmanaged vs managed "
+        f"({APP_ADOPTION_RATE*100:.0f}% app target)"
+    )
+    if price_spike:
+        title += f"\nPrice spike test: {price_spike.label()} @ EUR {price_spike.price_eur_mwh:.0f}/MWh (shaded)"
+    axes[0].set_title(title)
     axes[1].set_ylabel("EVs charging")
-    axes[1].set_xlabel("Time of day")
-    axes[1].set_xticks(list(xticks))
-    axes[1].set_xticklabels(xlabels, rotation=45, ha="right", fontsize=7)
+    if price_spike:
+        price_ax = axes[2]
+        price_ax.plot(
+            slots,
+            baseline_slot_prices,
+            color="#9ca3af",
+            lw=1.2,
+            ls="--",
+            label="Baseline wholesale",
+        )
+        price_ax.plot(
+            slots,
+            slot_prices,
+            color="#dc2626",
+            lw=1.8,
+            label="Spiked price profile",
+        )
+        for slot in spike_slots:
+            price_ax.axvspan(
+                slot - 0.5,
+                slot + 0.5,
+                color="#fecaca",
+                alpha=0.35,
+                zorder=0,
+            )
+        price_ax.set_ylabel("Price (EUR/MWh)")
+        price_ax.legend(loc="upper right", fontsize=7)
+        price_ax.grid(True, ls=":", alpha=0.5)
+        price_ax.set_xlabel("Time of day")
+        price_ax.set_xticks(list(xticks))
+        price_ax.set_xticklabels(xlabels, rotation=45, ha="right", fontsize=7)
+    else:
+        axes[1].set_xlabel("Time of day")
+        axes[1].set_xticks(list(xticks))
+        axes[1].set_xticklabels(xlabels, rotation=45, ha="right", fontsize=7)
     axes[0].legend(loc="lower left", fontsize=7, ncol=2)
     axes[0].grid(True, ls=":", alpha=0.5)
     axes[1].grid(True, ls=":", alpha=0.5)
     fig.tight_layout()
 
     graphs_dir = sim_cfg.ensure_graphs_dir()
-    chart_path = graphs_dir / "simulation_v5_15min.png"
+    chart_path = graphs_dir / chart_filename
     fig.savefig(chart_path, dpi=150, bbox_inches="tight")
     print(f"Chart: {chart_path}")
 
     if SAVE_OUTPUTS:
         kpi_df = pd.DataFrame(kpi_rows)
-        kpi_df.to_csv(out_dir / "simulation_v5_kpi.csv", index=False)
+        kpi_name = (
+            "simulation_v5_price_spike_kpi.csv"
+            if price_spike
+            else "simulation_v5_kpi.csv"
+        )
+        kpi_df.to_csv(out_dir / kpi_name, index=False)
         print(f"CSVs: {out_dir}")
         print(f"Mean peak reduction: {kpi_df['peak_reduction_mw'].mean():.2f} MW")
 
@@ -563,6 +714,21 @@ def main() -> None:
         plt.show()
     else:
         plt.close(fig)
+    return chart_path
+
+
+def main() -> None:
+    run_simulation_v5()
+
+
+def main_price_spike(
+    spike: PriceSpike | None = None,
+) -> Path:
+    return run_simulation_v5(
+        price_spike=spike or DEFAULT_PRICE_SPIKE,
+        output_subdir="simulation_v5_price_spike",
+        chart_filename="simulation_v5_15min_price_spike.png",
+    )
 
 
 if __name__ == "__main__":
