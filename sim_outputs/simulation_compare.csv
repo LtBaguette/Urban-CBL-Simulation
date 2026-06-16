@@ -1,0 +1,5 @@
+model,label,n_evs,kwh_per_day,app_adoption_rate,zone_capacity_mw,annual_customer_savings_eur,monthly_savings_per_ev_eur,annual_dso_savings_eur,peak_reduction_mw,peak_stress_managed,peak_stress_unmanaged,smart_scenario,reference_scenario,annual_fleet_savings_actual_adoption_eur,v5_runs,shared_n_evs,shared_kwh_per_day
+deterministic_app,"Deterministic APP
+(100% smart app)",5000,25.0,1.0,2291.2655713857143,1727889.780298451,28.79816300497418,159300.60860612258,0.0,1.1764705882352942,1.1764705882352942,smart_price_aware,immediate_plug_in,,,5000,25.0
+simulation_v5,"Simulation V5
+(per app user, 100% scaled)",5000,25.0,0.59996,2291.2655713857143,729119.0253486558,12.151983755810928,178568.2076577443,4.4159356475647655,1.1786682159604962,1.18059550701864,managed_partial_app,app_user_arrival_habit,437579.20627128903,5.0,5000,25.0

@@ -1,0 +1,98 @@
+# Zone Z2 deterministic simulation (Phase A defaults)
+
+fleet:
+  n_evs: 5000
+  kwh_per_day: 25
+  charger_kw: 11
+
+zone:
+  focus_id: Z2
+  reference_day: "2025-01-01"
+
+timing:
+  dt_hours: 0.25
+  dt_minutes: 15
+  peak_hour_start: 17
+  peak_hour_end: 21
+  offpeak_hour_end: 6
+  plug_in_hour: 18
+  ready_by_hour: 7
+  unmanaged_start: 17
+  unmanaged_end: 21
+
+capacity:
+  region: Noord-Brabant
+  max_congestion_derate: 0.15
+  derate_per_rating_point: 0.05
+
+intervention:
+  shift_pcts: [10, 15, 20]
+
+reference_annual_savings_eur:
+  10: 170596
+  15: 255894
+  20: 341192
+
+validation:
+  reference_savings_tolerance_pct: 6.0
+  energy_tolerance_mwh: 0.000001
+
+grid_aware:
+  load_penalty_eur_per_mw: 0.75
+
+# DSO monetization vs immediate plug-in (see config/dso_assumptions.md)
+dso_value:
+  eur_per_overload_minute_year: 48.0
+  eur_per_high_stress_minute_year: 20.0
+  # EUR/year per 0.01 daily peak stress ratio vs reference (not ×365)
+  eur_per_peak_stress_point_year: 20000.0
+  # EUR/year per MW of daily peak load reduction vs reference (not ×365)
+  eur_per_peak_mw_reduction_year: 6000.0
+  # Sum of stress reductions on slots where reference stress >= threshold (per day)
+  eur_per_congestion_stress_integral_day_year: 2000.0
+  sensitivity_pct: 20.0
+
+congestion_index_base: 19641.34
+stress_warning_threshold: 0.95
+
+outputs:
+  base_dir: sim_outputs
+  graphs_dir: Graphs
+
+plots:
+  mode: stakeholder   # stakeholder | full
+
+# Hourly AR(1) prototype — scripts/run_residuals.py (see sim/residuals.py)
+residuals:
+  app_adoption_rate: 0.60
+  simulation_repeats: 5
+  v5_simulation_repeats: 30   # grid + price oriented: distinct seeds averaged in method comparison
+  random_seed: 67
+  confidence_interval: 0.95
+  morning_max_window_h: 4
+  evening_deadline_h: 7   # aligns with timing.ready_by_hour
+  show_plot: false
+  save_outputs: true
+  charger_kw:
+    home: 11
+    fast: 50
+    super: 150
+  morning_charger_mix:
+    Home: 0.40
+    Fast: 0.50
+    Super: 0.10
+  evening_charger_mix:
+    Home: 0.75
+    Fast: 0.20
+    Super: 0.05
+  # grid + price oriented scheduler objective: price_weight × €/MWh + grid_weight × penalty × MW
+  v5_objective:
+    price_weight: 1.0
+    grid_weight: 1.0
+    grid_load_penalty_eur_per_mw: 0.08   # tuned vs price-oriented baseline (deterministic APP keeps 0.75)
+  # scripts/run_simulation_v5_price_spike.py — one 15-min slot with extreme wholesale price
+  price_spike_test:
+    start_hour: 3
+    start_minute: 0
+    duration_minutes: 15
+    price_eur_mwh: 500.0

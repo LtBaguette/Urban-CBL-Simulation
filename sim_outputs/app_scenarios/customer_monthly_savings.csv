@@ -1,0 +1,6 @@
+scenario,reference_scenario,daily_fleet_savings_eur,monthly_fleet_savings_eur,monthly_savings_per_ev_eur,annual_customer_savings_eur
+immediate_plug_in,immediate_plug_in,0.0,0.0,0.0,0.0
+unmanaged_evening,immediate_plug_in,393.68294629444426,11974.522949789347,2.3949045899578696,143694.27539747214
+smart_flat_spread,immediate_plug_in,2700.8789989583875,82151.73621831762,16.430347243663523,985820.8346198114
+smart_price_aware,immediate_plug_in,4733.944603557404,143990.81502487103,28.798163004974207,1727889.7802984524
+smart_grid_aware,immediate_plug_in,4659.558542856527,141728.23901188603,28.345647802377208,1700738.8681426325
