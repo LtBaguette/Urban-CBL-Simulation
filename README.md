@@ -30,8 +30,8 @@ Python simulation of electric-vehicle charging strategies for **Zone Z2 (Eindhov
 Clone the repository and install dependencies from the project root:
 
 ```bash
-git clone <repository-url>
-cd Urban-CBL-Simulation   # or whatever folder name your clone created
+git clone <https://github.com/LtBaguette/Urban-CBL-Simulation>
+cd Urban-CBL-Simulation
 
 python -m venv .venv
 
