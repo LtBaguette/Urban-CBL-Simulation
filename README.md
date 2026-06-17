@@ -2,6 +2,7 @@
 
 Python simulation of electric-vehicle charging strategies for **Zone Z2 (Eindhoven)**. It compares customer energy savings and DSO grid value across multiple charging methods, using TenneT congestion data, zonal load profiles, and Dutch wholesale electricity prices.
 
+## **If you did not clone the repository from github you can ignore the "Data files" part of Prerequisites and continue from the Setup section**
 ## Prerequisites
 
 - **Python 3.10+** (3.11 or 3.12 recommended)
