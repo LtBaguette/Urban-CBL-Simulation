@@ -461,7 +461,7 @@ def run_simulation_v5(
         if price_spike
         else "15-min AR1 + smart charging"
     )
-    print(f"\n=== Zone {FOCUS_ZONE} grid + price oriented ({experiment_label}) ===")
+    print(f"\n=== Zone {FOCUS_ZONE} el diablo ({experiment_label}) ===")
     print(
         f"Fleet: {N_EVS:,} EVs x {EV_KWH_PER_DAY} kWh/day = {EV_DAILY_MWH:.1f} MWh/day"
     )
@@ -690,7 +690,7 @@ def run_simulation_v5(
     axes[1].axhline(N_EVS, color="#6b7280", ls=":", lw=1.2, label="Fleet size")
     axes[0].set_ylabel("Demand (MW)")
     title = (
-        f"Zone {FOCUS_ZONE}: grid + price oriented — 15-min AR(1) unmanaged vs managed "
+        f"Zone {FOCUS_ZONE}: el diablo — 15-min AR(1) unmanaged vs managed "
         f"({APP_ADOPTION_RATE*100:.0f}% app target, {SIMULATION_REPEATS} seeds)"
     )
     if price_spike:

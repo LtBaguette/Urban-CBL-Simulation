@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run 15-min AR(1) stochastic simulation (grid + price oriented)."""
+"""Run 15-min AR(1) stochastic simulation (el diablo)."""
 
 import sys
 from pathlib import Path

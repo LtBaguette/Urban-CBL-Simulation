@@ -27,10 +27,9 @@ LABELS = {
     "smart_grid_aware": "Simulation\nAlgorithm",
 }
 
-PROFILE_SUBSET_STAKEHOLDER = [
-    "immediate_plug_in",
+PROFILE_INITIAL = [
     "unmanaged_evening",
-    "smart_price_aware",
+    "smart_grid_aware",
 ]
 
 
@@ -226,17 +225,7 @@ def plot_all_savings(kpi_df: pd.DataFrame, out_path: Path, cfg: SimConfig) -> No
         ),
     ]
     ax.legend(handles=legend_handles, loc="upper left", fontsize=9)
-    ax.text(
-        0.5,
-        -0.12,
-        "Stacked bars show who benefits; negative DSO = higher grid stress cost vs reference",
-        transform=ax.transAxes,
-        ha="center",
-        fontsize=9,
-        style="italic",
-    )
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.14)
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
@@ -322,6 +311,11 @@ def generate_all_graphs(cfg: SimConfig | None = None) -> list[Path]:
     app_profiles = graphs / "app_charging_profiles.png"
     _plot_charging_profiles(frames, app_profiles, cfg)
     paths.append(app_profiles)
+
+    initial_frames = {name: frames[name] for name in PROFILE_INITIAL}
+    initial_profile = graphs / "simulation_initial_profile.png"
+    _plot_charging_profiles(initial_frames, initial_profile, cfg, include_ev_panel=False)
+    paths.append(initial_profile)
 
     try:
         from sim.method_comparison import (

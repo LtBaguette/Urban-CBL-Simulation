@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run grid + price oriented sim with a short high-price window to test price-aware shifting."""
+"""Run el diablo sim with a short high-price window to test price-aware shifting."""
 
 import sys
 from pathlib import Path

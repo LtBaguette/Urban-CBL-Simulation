@@ -28,7 +28,7 @@ from sim.price_oriented_optimizer import optimize_ev_load_price_oriented
 from sim.residuals import load_residuals_config
 
 REFERENCE_METHOD = "immediate_plug_in"
-GRID_PRICE_ORIENTED_DISPLAY_NAME = "grid + price oriented"
+EL_DIABLO_DISPLAY_NAME = "el diablo"
 
 METHOD_ORDER: list[tuple[str, str]] = [
     ("immediate_plug_in", "Immediate plug-in"),
@@ -36,7 +36,7 @@ METHOD_ORDER: list[tuple[str, str]] = [
     ("smart_flat_spread", "Smart (flat spread)"),
     ("smart_price_aware", "Smart (price-aware)"),
     ("smart_grid_aware", "Simulation Algorithm"),
-    ("simulation_v5", GRID_PRICE_ORIENTED_DISPLAY_NAME),
+    ("simulation_v5", EL_DIABLO_DISPLAY_NAME),
     ("price_oriented_baseline", "Price-oriented"),
     ("grid_oriented_baseline", "Grid-oriented"),
 ]
@@ -252,7 +252,7 @@ def _row_from_v5(cfg: SimConfig, ref: ReferenceContext) -> dict:
     runs = sorted(v5_dir.glob("run_*_15min.csv"))
     if not runs:
         raise FileNotFoundError(
-            f"Missing grid + price oriented runs in {v5_dir}; run scripts/run_simulation_v5.py"
+            f"Missing el diablo runs in {v5_dir}; run scripts/run_simulation_v5.py"
         )
 
     per_run: list[dict] = []
@@ -338,7 +338,7 @@ def _row_from_v5(cfg: SimConfig, ref: ReferenceContext) -> dict:
 
 
 def _row_from_price_oriented(cfg: SimConfig, ref: ReferenceContext) -> dict:
-    """Price-only block scheduler on the same stochastic days as grid + price oriented."""
+    """Price-only block scheduler on the same stochastic days as el diablo."""
     from sim.simulation_v5 import _apply_runtime_config, build_arrival_weights
 
     sim_cfg, res_cfg = load_residuals_config(cfg)
@@ -350,7 +350,7 @@ def _row_from_price_oriented(cfg: SimConfig, ref: ReferenceContext) -> dict:
     runs = sorted(v5_dir.glob("run_*_15min.csv"))
     if not runs:
         raise FileNotFoundError(
-            f"Missing grid + price oriented runs in {v5_dir}; run scripts/run_simulation_v5.py"
+            f"Missing el diablo runs in {v5_dir}; run scripts/run_simulation_v5.py"
         )
 
     per_run: list[dict] = []
@@ -458,7 +458,7 @@ def _row_from_price_oriented(cfg: SimConfig, ref: ReferenceContext) -> dict:
 
 
 def _row_from_grid_oriented(cfg: SimConfig, ref: ReferenceContext) -> dict:
-    """Grid-only block scheduler on the same stochastic days as grid + price oriented."""
+    """Grid-only block scheduler on the same stochastic days as el diablo."""
     from sim.simulation_v5 import _apply_runtime_config, build_arrival_weights
 
     sim_cfg, res_cfg = load_residuals_config(cfg)
@@ -469,7 +469,7 @@ def _row_from_grid_oriented(cfg: SimConfig, ref: ReferenceContext) -> dict:
     runs = sorted(v5_dir.glob("run_*_15min.csv"))
     if not runs:
         raise FileNotFoundError(
-            f"Missing grid + price oriented runs in {v5_dir}; run scripts/run_simulation_v5.py"
+            f"Missing el diablo runs in {v5_dir}; run scripts/run_simulation_v5.py"
         )
 
     per_run: list[dict] = []
@@ -724,7 +724,7 @@ def plot_method_comparison(df: pd.DataFrame, out_path: Path, cfg: SimConfig) -> 
         0.01,
         f"{adoption_pct}% of fleet on each method's schedule; "
         f"{100 - adoption_pct}% remain on immediate plug-in (reference). "
-        f"{GRID_PRICE_ORIENTED_DISPLAY_NAME}: mean of {v5_runs} stochastic runs "
+        f"{EL_DIABLO_DISPLAY_NAME}: mean of {v5_runs} stochastic runs "
         f"(seeds {res_cfg.random_seed + 1}–{res_cfg.random_seed + v5_runs}).",
         ha="center",
         fontsize=9,
@@ -740,7 +740,7 @@ def _v5_run_paths(cfg: SimConfig) -> list[Path]:
     runs = sorted(v5_dir.glob("run_*_15min.csv"))
     if not runs:
         raise FileNotFoundError(
-            f"Missing grid + price oriented runs in {v5_dir}; run scripts/run_simulation_v5.py"
+            f"Missing el diablo runs in {v5_dir}; run scripts/run_simulation_v5.py"
         )
     return runs
 

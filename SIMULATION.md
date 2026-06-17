@@ -4,13 +4,13 @@
 
 ```bash
 pip install -r requirements.txt
-python scripts/run_zone2.py
 python scripts/run_app_scenarios.py
-python scripts/generate_graphs.py
-python scripts/run_residuals.py   # optional: hourly AR(1) + partial app adoption
-python scripts/run_simulation_v5.py
-python scripts/run_simulation_v5_price_spike.py   # optional: high-price window test
+python scripts/run_simulation_v5.py          # el diablo
 python scripts/run_method_comparison.py
+python scripts/generate_graphs.py            # run last: needs method_comparison.csv
+python scripts/run_zone2.py                  # optional: baseline interventions
+python scripts/run_residuals.py              # optional: hourly AR(1) prototype
+python scripts/run_simulation_v5_price_spike.py   # optional: high-price window test
 python -m pytest tests/ -q
 ```
 
@@ -29,7 +29,7 @@ Configuration: [`config/default.yaml`](config/default.yaml)
 | `sim/validate.py` | Reference savings check |
 | `sim/deterministic.py` | Main simulation runners |
 | `sim/residuals.py` | Hourly AR(1) demand + charger mix + partial smart charging |
-| `sim/simulation_v5.py` | grid + price oriented — 15-min AR(1) stochastic optimizer |
+| `sim/simulation_v5.py` | el diablo — 15-min AR(1) stochastic optimizer |
 | `sim/method_comparison.py` | Unified 8-method KPI table + comparison chart (5 methods on chart) |
 | `sim/price_oriented_optimizer.py` | Price-only block scheduler (method comparison) |
 | `sim/grid_oriented_optimizer.py` | Grid-only block scheduler (method comparison) |
@@ -46,7 +46,7 @@ Eight methods on **identical fields**, reference = `immediate_plug_in`:
 | `smart_flat_spread` | Smart (flat spread) |
 | `smart_price_aware` | Smart (price-aware) |
 | `smart_grid_aware` | Simulation Algorithm |
-| `simulation_v5` | grid + price oriented (~60% app) |
+| `simulation_v5` | el diablo (~60% app) |
 | `price_oriented_baseline` | Price-oriented (`sim/price_oriented_optimizer.py`) |
 | `grid_oriented_baseline` | Grid-oriented (`sim/grid_oriented_optimizer.py`, V5 without price term) |
 
@@ -54,13 +54,13 @@ Eight methods on **identical fields**, reference = `immediate_plug_in`:
 
 All methods use **`residuals.app_adoption_rate`** (default 60%): blended EV load = 40% immediate plug-in + 60% method schedule; stochastic methods model partial adoption on the same V5 grid days.
 
-**grid + price oriented** uses **`residuals.v5_simulation_repeats`** (default **30**): distinct AR(1) seeds averaged for KPIs and the comparison chart footer.
+**el diablo** uses **`residuals.v5_simulation_repeats`** (default **30**): distinct AR(1) seeds averaged for KPIs and the comparison chart footer.
 
 Scheduler objective (`residuals.v5_objective` in YAML): `price_weight × €/MWh + grid_weight × grid_load_penalty × MW`. Tuned separately from deterministic `grid_aware.load_penalty_eur_per_mw` (0.75).
 
-Price-oriented and grid-oriented baselines are built in `run_method_comparison.py` on the same stochastic days as grid + price oriented.
+Price-oriented and grid-oriented baselines are built in `run_method_comparison.py` on the same stochastic days as el diablo.
 
-## grid + price oriented (simulation_v5)
+## el diablo (simulation_v5)
 
 | Output | Path |
 |--------|------|
@@ -86,13 +86,15 @@ Tune `residuals:` in [`config/default.yaml`](config/default.yaml). Do not compar
 
 - **DSO vs customer savings** in `app_scenarios_kpi.csv` (`annual_dso_savings_eur`, `dso_savings_warning`)
 - Rate assumptions: [`config/dso_assumptions.md`](config/dso_assumptions.md) and `dso_value` in YAML — overload minutes, high-stress minutes, peak stress ratio, **peak MW reduction**, congestion integral (±20% sensitivity)
-- **Charts:** all PNGs under [`Graphs/`](Graphs/) (stakeholder pack + profiles; CSVs stay in `sim_outputs/`). `generate_graphs.py` can also refresh method-comparison PNGs when V5 outputs exist.
+- **Charts:** all PNGs under [`Graphs/`](Graphs/) (stakeholder pack + profiles; CSVs stay in `sim_outputs/`). Run `generate_graphs.py` **after** `run_method_comparison.py` — it requires `method_comparison.csv` and refreshes comparison PNGs alongside the stakeholder pack.
 - **Monthly customer savings:** `sim/customer_savings.py` → `sim_outputs/app_scenarios/customer_monthly_savings.csv` and `Graphs/graph_customer_monthly_savings.png` (methods on comparison chart only)
 - Reference gap diagnosis printed by `scripts/run_zone2.py` (`summarize_reference_gap`)
 
 ## Tests
 
 - `tests/test_zone2_invariants.py` — energy balance, capacity constant, grid ≠ price
-- `tests/test_kpi_regression.py` — KPI snapshot tolerances
+- `tests/test_kpi_regression.py` — KPI snapshot tolerances (needs `run_app_scenarios.py`; zone2 branch needs `run_zone2.py`)
 - `tests/test_capacity.py` — capacity metadata sanity
 - `tests/test_dso_value.py` — DSO warnings and rate bounds
+- `tests/test_method_comparison.py` — unified 8-method table (needs `run_app_scenarios.py` + `run_simulation_v5.py`)
+- `tests/test_residuals.py` — hourly prototype (needs `run_residuals.py`)

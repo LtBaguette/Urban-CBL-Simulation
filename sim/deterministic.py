@@ -35,9 +35,13 @@ from sim.validate import summarize_reference_gap, validate_reference_savings
 
 
 def _plot_charging_profiles(
-    frames: dict[str, pd.DataFrame], out_path: Path, cfg: SimConfig
+    frames: dict[str, pd.DataFrame],
+    out_path: Path,
+    cfg: SimConfig,
+    *,
+    include_ev_panel: bool = True,
+    title: str | None = None,
 ) -> None:
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
     colors = {
         "immediate_plug_in": "#dc2626",
         "unmanaged_evening": "#ea580c",
@@ -45,25 +49,42 @@ def _plot_charging_profiles(
         "smart_price_aware": "#059669",
         "smart_grid_aware": "#7c3aed",
     }
+    n_rows = 3 if include_ev_panel else 2
+    fig, axes = plt.subplots(n_rows, 1, figsize=(12, 10 if include_ev_panel else 7), sharex=True)
+    if include_ev_panel:
+        ev_ax, total_ax, stress_ax = axes
+    else:
+        total_ax, stress_ax = axes
+        ev_ax = None
+
     for name, frame in frames.items():
         c = colors.get(name)
-        axes[0].plot(frame.index, frame["EV_Load_MW"], label=name, color=c, alpha=0.9)
-        axes[1].plot(frame.index, frame["Total_Load_MW"], label=name, color=c, alpha=0.9)
-        axes[2].plot(frame.index, frame["Stress_Ratio"], label=name, color=c, alpha=0.9)
+        if ev_ax is not None:
+            ev_ax.plot(frame.index, frame["EV_Load_MW"], label=name, color=c, alpha=0.9)
+        total_ax.plot(frame.index, frame["Total_Load_MW"], label=name, color=c, alpha=0.9)
+        stress_ax.plot(frame.index, frame["Stress_Ratio"], label=name, color=c, alpha=0.9)
+
     cap = next(iter(frames.values()))["Zone_Capacity_MW"].iloc[0]
-    axes[1].axhline(cap, color="#6b7280", linestyle="--", label="Zone capacity")
-    axes[2].axhline(1.0, color="#6b7280", linestyle="--", label="Stress = 1.0")
-    axes[0].set_ylabel("EV load (MW)")
-    axes[0].set_title(f"Zone {cfg.focus_zone}: APP smart charging scenarios")
-    axes[0].legend(loc="upper left", fontsize=8)
-    axes[0].grid(True, linestyle="--", alpha=0.5)
-    axes[1].set_ylabel("Total load (MW)")
-    axes[1].legend(loc="upper left", fontsize=8)
-    axes[1].grid(True, linestyle="--", alpha=0.5)
-    axes[2].set_ylabel("Stress ratio")
-    axes[2].set_xlabel("Time of day")
-    axes[2].legend(loc="upper left", fontsize=8)
-    axes[2].grid(True, linestyle="--", alpha=0.5)
+    chart_title = title or f"Zone {cfg.focus_zone}: APP smart charging scenarios"
+
+    if ev_ax is not None:
+        ev_ax.set_ylabel("EV load (MW)")
+        ev_ax.set_title(chart_title)
+        ev_ax.legend(loc="upper left", fontsize=8)
+        ev_ax.grid(True, linestyle="--", alpha=0.5)
+    else:
+        total_ax.set_title(chart_title)
+
+    total_ax.axhline(cap, color="#6b7280", linestyle="--", label="Zone capacity")
+    total_ax.set_ylabel("Total load (MW)")
+    total_ax.legend(loc="upper left", fontsize=8)
+    total_ax.grid(True, linestyle="--", alpha=0.5)
+
+    stress_ax.axhline(1.0, color="#6b7280", linestyle="--", label="Stress = 1.0")
+    stress_ax.set_ylabel("Stress ratio")
+    stress_ax.set_xlabel("Time of day")
+    stress_ax.legend(loc="upper left", fontsize=8)
+    stress_ax.grid(True, linestyle="--", alpha=0.5)
     fig.autofmt_xdate()
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -219,6 +240,15 @@ def run_app_scenarios(cfg: SimConfig | None = None) -> pd.DataFrame:
 
     graphs_dir = cfg.ensure_graphs_dir()
     _plot_charging_profiles(frames, graphs_dir / "app_charging_profiles.png", cfg)
+    initial_frames = {
+        k: frames[k] for k in ("unmanaged_evening", "smart_grid_aware") if k in frames
+    }
+    _plot_charging_profiles(
+        initial_frames,
+        graphs_dir / "simulation_initial_profile.png",
+        cfg,
+        include_ev_panel=False,
+    )
 
     print("=== Zone Z2 APP smart charging simulation ===")
     print(

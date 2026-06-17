@@ -66,7 +66,7 @@ plots:
 residuals:
   app_adoption_rate: 0.60
   simulation_repeats: 5
-  v5_simulation_repeats: 30   # grid + price oriented: distinct seeds averaged in method comparison
+  v5_simulation_repeats: 30   # el diablo: distinct seeds averaged in method comparison
   random_seed: 67
   confidence_interval: 0.95
   morning_max_window_h: 4
@@ -85,7 +85,7 @@ residuals:
     Home: 0.75
     Fast: 0.20
     Super: 0.05
-  # grid + price oriented scheduler objective: price_weight × €/MWh + grid_weight × penalty × MW
+  # el diablo scheduler objective: price_weight × €/MWh + grid_weight × penalty × MW
   v5_objective:
     price_weight: 1.0
     grid_weight: 1.0
